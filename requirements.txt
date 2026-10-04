@@ -2,4 +2,4 @@ fastapi
 uvicorn
 pypdf
 scikit-learn
-gunicorn
+python-multipart
