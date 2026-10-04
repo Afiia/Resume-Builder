@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Resume Tailorer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: {
+  colors: { ink: "#0e1621", panel: "#141e2c", line: "#243044", text: "#d9e1ec", mute: "#8796ab", brass: "#c9a96e", jade: "#6fbf9b", ember: "#e0925a" },
+  fontFamily: { serif: ["Newsreader", "Georgia", "serif"], sans: ["IBM Plex Sans", "system-ui", "sans-serif"] }
+}}};
+</script>
+<style>
+  body { background: radial-gradient(1200px 600px at 80% -10%, #1a2740 0%, #0e1621 60%); background-color: #0e1621; }
+  textarea { resize: vertical; line-height: 1.6; }
+  textarea:focus-visible, button:focus-visible { outline: 2px solid #c9a96e; outline-offset: 2px; }
+  .ring-fg { transition: stroke-dashoffset 1.4s cubic-bezier(.2,.7,.2,1); }
+  .upload:focus-within { outline: 2px solid #c9a96e; outline-offset: 2px; }
+  textarea.drag { border-color: #c9a96e; background: #1a2740; }
+  @media print {
+    body { background: #fff !important; }
+    body * { visibility: hidden; }
+    #resumeOut, #resumeOut * { visibility: visible; }
+    #resumeOut { position: absolute; left: 0; top: 0; width: 100%; border: 0; background: #fff; color: #000; padding: 0; font-size: 11pt; }
+  }
+  ::selection { background: #c9a96e55; }
+  @media (prefers-reduced-motion: reduce) { .ring-fg { transition: none; } .animate-spin { animation: none; } html { scroll-behavior: auto; } }
+</style>
+</head>
+<body class="font-sans text-text antialiased min-h-screen">
+<main class="max-w-6xl mx-auto px-5 sm:px-8 py-10 sm:py-16">
+
+  <header class="max-w-2xl">
+    <h1 class="font-serif text-4xl sm:text-5xl leading-tight text-white">Make your resume read the way the job is written.</h1>
+    <p class="mt-4 text-mute leading-relaxed">Paste your resume and the job posting. You'll see how well they match, which keywords you're missing, and stronger versions of your bullets.</p>
+  </header>
+
+  <section class="mt-10 grid md:grid-cols-2 gap-px bg-line rounded-xl overflow-hidden border border-line">
+    <div class="bg-panel p-5">
+      <div class="flex items-baseline justify-between">
+        <label for="resume" class="font-medium text-white">Resume</label>
+        <div class="flex items-center gap-4">
+          <label class="upload cursor-pointer text-xs font-medium text-brass hover:text-[#d8bb84] rounded px-1">Upload PDF<input type="file" accept="application/pdf,.pdf" data-target="resume" class="sr-only"></label>
+          <span id="resumeCount" class="text-xs text-mute">0 words</span>
+        </div>
+      </div>
+      <textarea id="resume" rows="15" placeholder="Paste your resume text here"
+        class="mt-3 w-full bg-ink/60 border border-line rounded-lg p-4 text-sm text-text placeholder-mute/70"></textarea>
+      <p id="resumeNote" class="mt-2 text-xs text-mute min-h-[1rem]">Paste text, drop a PDF here, or use Upload PDF.</p>
+    </div>
+    <div class="bg-panel p-5">
+      <div class="flex items-baseline justify-between">
+        <label for="jd" class="font-medium text-white">Job description</label>
+        <div class="flex items-center gap-4">
+          <label class="upload cursor-pointer text-xs font-medium text-brass hover:text-[#d8bb84] rounded px-1">Upload PDF<input type="file" accept="application/pdf,.pdf" data-target="jd" class="sr-only"></label>
+          <span id="jdCount" class="text-xs text-mute">0 words</span>
+        </div>
+      </div>
+      <textarea id="jd" rows="15" placeholder="Paste the job posting here"
+        class="mt-3 w-full bg-ink/60 border border-line rounded-lg p-4 text-sm text-text placeholder-mute/70"></textarea>
+      <p id="jdNote" class="mt-2 text-xs text-mute min-h-[1rem]">Paste text, drop a PDF here, or use Upload PDF.</p>
+    </div>
+  </section>
+
+  <div class="mt-5 flex flex-col sm:flex-row sm:items-center gap-4">
+    <button id="go" class="inline-flex items-center justify-center gap-2.5 rounded-lg bg-brass hover:bg-[#d8bb84] active:bg-[#bd9d62] disabled:opacity-60 disabled:cursor-wait transition-colors text-ink font-semibold px-7 py-3">
+      <svg id="spin" class="hidden animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3.5" opacity=".25"/><path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3.5" stroke-linecap="round"/></svg>
+      <span id="label">Optimize resume</span>
+    </button>
+    <span class="hidden sm:inline text-xs text-mute">or press Ctrl/⌘ + Enter</span>
+    <p id="error" role="alert" class="text-sm text-ember"></p>
+  </div>
+
+  <section id="results" class="hidden mt-16" aria-live="polite">
+
+    <div class="grid md:grid-cols-[auto,1fr] gap-x-12 gap-y-10 items-start border-t border-line pt-12">
+      <div class="relative h-44 w-44 mx-auto md:mx-0">
+        <svg viewBox="0 0 120 120" class="h-full w-full -rotate-90" aria-hidden="true">
+          <circle cx="60" cy="60" r="54" fill="none" stroke="#243044" stroke-width="2"/>
+          <circle id="ring" class="ring-fg" cx="60" cy="60" r="54" fill="none" stroke="#c9a96e" stroke-width="5" stroke-linecap="round" stroke-dasharray="339.3" stroke-dashoffset="339.3"/>
+        </svg>
+        <div class="absolute inset-0 flex flex-col items-center justify-center">
+          <span id="score" class="font-serif text-6xl text-white leading-none">0</span>
+          <span class="mt-1 text-xs text-mute">ATS score, out of 100</span>
+        </div>
+      </div>
+      <div class="max-w-2xl">
+        <h2 id="band" class="font-serif text-3xl text-white"></h2>
+        <p id="verdict" class="mt-3 text-mute leading-relaxed"></p>
+        <div id="breakdown" class="mt-6 grid sm:grid-cols-2 gap-x-8 gap-y-4"></div>
+        <div class="mt-8">
+          <h3 class="font-medium text-white">Keywords to work in</h3>
+          <div id="keywords" class="mt-3 flex flex-wrap gap-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-16">
+      <h2 class="font-serif text-3xl text-white">How to improve this resume</h2>
+      <p class="mt-2 text-mute max-w-xl">Specific changes for this job, most important first.</p>
+      <div id="feedback" class="mt-6 border-t border-line"></div>
+    </div>
+
+    <div class="mt-16">
+      <h2 class="font-serif text-3xl text-white">Structure and layout</h2>
+      <p class="mt-2 text-mute max-w-xl">Section order, formatting and anything that could trip up ATS parsing. These come from the extracted text, so check the actual file's alignment too.</p>
+      <div id="structure" class="mt-6 border-t border-line"></div>
+    </div>
+
+    <div class="mt-16">
+      <h2 class="font-serif text-3xl text-white">Wording and grammar fixes</h2>
+      <div id="wording" class="mt-6 border-t border-line"></div>
+    </div>
+
+    <div class="mt-16">
+      <h2 class="font-serif text-3xl text-white">Suggested bullet rewrites</h2>
+      <p class="mt-2 text-mute max-w-xl">Each follows the X-Y-Z pattern: what you achieved, how it was measured, and what you did. Replace bracketed placeholders with your real numbers.</p>
+      <div id="bullets" class="mt-8 border-t border-line"></div>
+    </div>
+
+    <div class="mt-16">
+      <div class="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 class="font-serif text-3xl text-white">Your tailored resume</h2>
+          <p class="mt-2 text-mute max-w-xl">A clean, single-column version written for this job. Check every line before you send it.</p>
+        </div>
+        <div class="flex gap-2 text-sm">
+          <button id="copyResume" class="rounded-lg border border-line px-4 py-2 hover:border-brass transition-colors">Copy</button>
+          <button id="dlResume" class="rounded-lg border border-line px-4 py-2 hover:border-brass transition-colors">Download .txt</button>
+          <button id="pdfResume" class="rounded-lg bg-brass text-ink font-semibold px-4 py-2 hover:bg-[#d8bb84] transition-colors">Save as PDF</button>
+        </div>
+      </div>
+      <div id="resumeOut" class="mt-6 rounded-xl border border-line bg-panel p-6 sm:p-8 text-sm leading-relaxed whitespace-pre-wrap text-white"></div>
+    </div>
+  </section>
+
+  <footer class="mt-20 pt-6 border-t border-line text-xs text-mute">Review every suggestion before using it. Only claim experience you actually have.</footer>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const CIRC = 2 * Math.PI * 54;
+let rewrites = [];
+
+const esc = (s) => String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const cleanText = (s) => String(s || "").replace(/[\u2018\u2019]/g, "'").replace(/[\u201C\u201D]/g, '"').replace(/\r\n/g, "\n").trim();
+const words = (s) => (s.trim() ? s.trim().split(/\s+/).length : 0);
+
+["resume", "jd"].forEach((id) => $(id).addEventListener("input", () => {
+  const n = words($(id).value);$(id + "Count").textContent = `${n.toLocaleString()} word${n === 1 ? "" : "s"}`;
+}));
+
+function setLoading(on) {
+  $("go").disabled = on;
+  $("spin").classList.toggle("hidden", !on);
+  $("label").textContent = on ? "Analyzing…" : "Optimize resume";
+}
+
+function band(n) {
+  if (n >= 75) return ["#6fbf9b", "Strong match", "Your resume already speaks the language of this role. Tighten the bullets below and add the few missing terms."];
+  if (n >= 50) return ["#c9a96e", "Partial match", "The fundamentals are there. Working in the missing keywords and sharpening your bullets should lift this noticeably."];
+  return ["#e0925a", "Weak match", "The posting emphasizes things your resume barely mentions. Reframe your experience around the keywords listed here."];
+}
+
+const SEV = { high: ["#e0925a", "High priority"], medium: ["#c9a96e", "Medium"], low: ["#8796ab", "Nice to have"] };
+const barColor = (n) => (n >= 75 ? "#6fbf9b" : n >= 50 ? "#c9a96e" : "#e0925a");
+const empty = (t) => `<p class="py-6 text-sm text-mute border-b border-line">${t}</p>`;
+let tailoredText = "";
+
+function render(d) {
+  const score = d.match_score || 0;
+  const [color, title] = band(score);
+  $("band").textContent = title;
+  $("verdict").textContent = d.summary || "";
+  $("score").textContent = score;
+  $("ring").setAttribute("stroke", color);
+  $("ring").style.strokeDashoffset = CIRC;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    $("ring").style.strokeDashoffset = CIRC * (1 - score / 100);
+  }));
+
+  const sb = d.score_breakdown || { keywords: 0, skills: 0, experience: 0, structure: 0 };
+  $("breakdown").innerHTML = [["Keyword match", sb.keywords || 0], ["Skills fit", sb.skills || 0], ["Experience relevance", sb.experience || 0], ["Structure and formatting", sb.structure || 0]]
+    .map(([l, n]) => `<div><div class="flex justify-between text-sm"><span class="text-text">${l}</span><span class="text-mute">${n}</span></div>
+      <div class="mt-1.5 h-1.5 rounded-full bg-line"><div class="h-1.5 rounded-full" style="width:${n}%;background:${barColor(n)}"></div></div></div>`).join("");
+
+  const missing = d.missing_keywords || [];
+  $("keywords").innerHTML = missing.length
+    ? missing.map((k) => `<span class="rounded-md border border-line bg-panel px-3 py-1.5 text-sm text-text">${esc(k)}</span>`).join("")
+    : `<p class="text-mute text-sm">No major keywords are missing.</p>`;
+
+  const order = { high: 0, medium: 1, low: 2 };
+  const feedback = d.improvement_feedback || [];
+  $("feedback").innerHTML = feedback.length
+    ? [...feedback].sort((a, b) => (order[a.priority] ?? 2) - (order[b.priority] ?? 2)).map((f) => `
+      <article class="py-6 border-b border-line grid md:grid-cols-[11rem,1fr] gap-x-10 gap-y-2">
+        <div>
+          <p class="font-medium text-white">${esc(f.area)}</p>
+          <p class="mt-1 text-xs flex items-center gap-2 text-mute"><span class="inline-block h-2 w-2 rounded-full" style="background:${SEV[f.priority]?.[0] || "#8796ab"}"></span>${SEV[f.priority]?.[1] || "Low"}</p>
+        </div>
+        <div>
+          <p class="text-sm leading-relaxed text-mute">${esc(f.issue)}</p>
+          <p class="mt-2 text-sm leading-relaxed text-white">${esc(f.recommendation)}</p>
+        </div>
+      </article>`).join("")
+    : empty("No major improvements suggested.");
+
+  const structure = d.structure_feedback || [];
+  $("structure").innerHTML = structure.length
+    ? structure.map((f) => `
+      <article class="py-6 border-b border-line grid md:grid-cols-2 gap-x-10 gap-y-2">
+        <p class="text-sm leading-relaxed text-mute">${esc(f.issue)}</p>
+        <p class="text-sm leading-relaxed text-white md:border-l md:border-brass/50 md:pl-8">${esc(f.fix)}</p>
+      </article>`).join("")
+    : empty("The structure looks ATS-friendly.");
+
+  const wording = d.wording_fixes || [];
+  $("wording").innerHTML = wording.length
+    ? wording.map((w) => `
+      <article class="py-6 border-b border-line grid md:grid-cols-[11rem,1fr,1fr] gap-x-10 gap-y-2">
+        <p class="text-sm font-medium text-brass">${esc(w.issue_type)}</p>
+        <p class="text-sm leading-relaxed text-mute line-through decoration-mute/40">${esc(w.original)}</p>
+        <p class="text-sm leading-relaxed text-white">${esc(w.corrected)}</p>
+      </article>`).join("")
+    : empty("No spelling or grammar errors found.");
+
+  rewrites = d.suggested_bullet_rewrites || [];
+  $("bullets").innerHTML = rewrites.map((b, i) => `
+    <article class="py-8 border-b border-line">
+      <div class="grid md:grid-cols-2 gap-x-10 gap-y-6">
+        <div>
+          <h3 class="text-sm font-medium text-mute">Original</h3>
+          <p class="mt-2 text-sm leading-relaxed text-mute">${esc(b.original)}</p>
+        </div>
+        <div class="md:border-l md:border-brass/50 md:pl-8">
+          <div class="flex items-center justify-between gap-4">
+            <h3 class="text-sm font-medium text-brass">Tailored</h3>
+            <button data-i="${i}" class="copy text-xs text-mute hover:text-white transition-colors rounded px-2 py-1 -mr-2">Copy</button>
+          </div>
+          <p class="mt-2 leading-relaxed text-white">${esc(b.tailored)}</p>
+        </div>
+      </div>
+      <p class="mt-5 text-sm leading-relaxed text-mute md:max-w-[calc(50%-1.25rem)] md:ml-auto md:pl-8"><span class="text-text font-medium">Why this works.</span> ${esc(b.justification)}</p>
+    </article>`).join("");
+
+  tailoredText = d.tailored_resume || "";
+  $("resumeOut").textContent = tailoredText;
+
+  $("results").classList.remove("hidden");
+  $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+$("copyResume").addEventListener("click", async (e) => {
+  try { await navigator.clipboard.writeText(tailoredText); e.target.textContent = "Copied"; }
+  catch { e.target.textContent = "Copy failed"; }
+  setTimeout(() => (e.target.textContent = "Copy"), 1500);
+});
+$("dlResume").addEventListener("click", () => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([tailoredText], { type: "text/plain;charset=utf-8" }));
+  a.download = "tailored-resume.txt";
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+$("pdfResume").addEventListener("click", () => window.print());
+
+$("bullets").addEventListener("click", async (e) => {
+  const btn = e.target.closest(".copy");
+  if (!btn) return;
+  try {
+    await navigator.clipboard.writeText(rewrites[btn.dataset.i].tailored);
+    btn.textContent = "Copied";
+    setTimeout(() => (btn.textContent = "Copy"), 1500);
+  } catch { btn.textContent = "Copy failed"; }
+});
+
+const MAX_PDF = 10 * 1024 * 1024;
+const NOTE_DEFAULT = "Paste text, drop a PDF here, or use Upload PDF.";
+
+async function loadPdf(file, target) {
+  const note = $(target + "Note");
+  $("error").textContent = "";
+  if (!file) return;
+  if (!/\.pdf$/i.test(file.name) && file.type !== "application/pdf") {
+    $("error").textContent = "Please choose a PDF file.";
+    return;
+  }
+  if (file.size > MAX_PDF) {
+    $("error").textContent = "That PDF is larger than 10 MB.";
+    return;
+  }
+  note.textContent = `Reading ${file.name}…`;
+  try {
+    const body = new FormData();
+    body.append("file", file);
+    const res = await fetch("/api/extract-pdf", { method: "POST", body });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "Could not read that PDF.");
+    $(target).value = data.text || "";
+    $(target).dispatchEvent(new Event("input"));
+    note.textContent = `Loaded ${file.name}. You can edit the text before optimizing.`;
+  } catch (e) {
+    note.textContent = NOTE_DEFAULT;
+    $("error").textContent = e.message;
+  }
+}
+
+document.querySelectorAll('input[type="file"]').forEach((inp) => {
+  inp.addEventListener("change", () => { loadPdf(inp.files[0], inp.dataset.target); inp.value = ""; });
+});
+["resume", "jd"].forEach((id) => {
+  const ta = $(id);
+  ta.addEventListener("dragover", (e) => { e.preventDefault(); ta.classList.add("drag"); });
+  ta.addEventListener("dragleave", () => ta.classList.remove("drag"));
+  ta.addEventListener("drop", (e) => {
+    ta.classList.remove("drag");
+    const f = e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) { e.preventDefault(); loadPdf(f, id); }
+  });
+});
+
+async function run() {
+  const resume_text = cleanText($("resume").value);
+  const job_description = cleanText($("jd").value);
+  $("error").textContent = "";
+  if (resume_text.length < 50 || job_description.length < 50) {
+    $("error").textContent = "Add at least a few lines to both the resume and the job description.";
+    return;
+  }
+  setLoading(true);
+  try {
+    const res = await fetch("/api/tailor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({ resume_text, job_description }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(typeof data.detail === "string" ? data.detail : "The request failed. Check your input and try again.");
+    }
+    render(data);
+  } catch (e) {
+    $("error").textContent = e.message || "An unexpected error occurred.";
+  } finally {
+    setLoading(false);
+  }
+}
+
+$("go").addEventListener("click", run);
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && !$("go").disabled) run();
+});
+</script>
+</body>
+</html>
